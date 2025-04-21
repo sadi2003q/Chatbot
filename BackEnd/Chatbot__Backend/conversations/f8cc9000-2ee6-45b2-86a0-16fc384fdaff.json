@@ -1,0 +1,10 @@
+[
+    {
+        "type": "HumanMessage",
+        "content": "Hi"
+    },
+    {
+        "type": "AIMessage",
+        "content": "Hi there! How can I help you today?"
+    }
+]

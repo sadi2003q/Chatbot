@@ -13,28 +13,48 @@ struct ContentView: View {
     @State private var messages: [Message] = []
     @State private var isLoading = false
     
+    @State private var conversations: [String] = []
+    @State private var selectedConversation: String? = nil
+    @State private var showSidebar = false
+    
     @State private var scrollViewID = UUID()
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Messages list
-                view_MessageScrollBar
-                
-                // Input area
-                view_InputArea
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Conversation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("new", systemImage: "plus.circle.fill") {
-                        newConversation()
+        ZStack {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    // Messages list
+                    view_MessageScrollBar
+                    
+                    // Input area
+                    view_InputArea
+                }
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("Conversation")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        button_NewConversation
+                    }
+                    
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        button_ConversationHistory
                     }
                 }
             }
+            .onChange(of: selectedConversation) {
+                Task {
+                    await loadSelectedConversation()
+                }
+            }
+            
+            ChatHistorySidebar(
+                conversations: $conversations,
+                isShowing: $showSidebar,
+                selectedConversation: $selectedConversation
+            )
         }
+        
     }
     
     // MARK: - Message Area
@@ -93,6 +113,7 @@ struct ContentView: View {
             .padding(.leading)
     }
     
+    //MARK: - BUTTONS
     private var button_SendQuery: some View {
         Button {
             Task {
@@ -109,10 +130,26 @@ struct ContentView: View {
         .padding(.trailing)
     }
     
+    private var button_ConversationHistory: some View {
+        Button(action: {
+            Task {
+                await ConversationListHistory()
+            }
+            showSidebar.toggle()
+        }) {
+            Image(systemName: "line.3.horizontal")
+        }
+    }
+    
+    private var button_NewConversation: some View {
+        Button("new", systemImage: "plus.circle.fill") {
+            newConversation()
+        }
+    }
     
     
     
-    // MARK: - Loading Animation View
+    
     
     
     // MARK: - Network Functions
@@ -180,12 +217,12 @@ struct ContentView: View {
         }
     }
     
-    @MainActor
     private func newConversation() {
         // Clear messages with animation
         withAnimation(.spring()) {
             messages.removeAll()
             scrollViewID = UUID()
+            selectedConversation = nil
         }
 
         Task {
@@ -216,12 +253,119 @@ struct ContentView: View {
         
         isLoading = false
     }
+    
+    @MainActor
+    private func ConversationListHistory() async {
+        
+        do {
+            guard let url = URL(string: "http://127.0.0.1:8000/list_conversations") else {
+                throw URLError(.badURL)
+            }
+            
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                let responses = try JSONDecoder().decode(ServerResponse_History.self, from: data)
+                for file in responses.files {
+                    print(file)
+                }
+                conversations = responses.files
+                            
+                
+            }
+            
+            
+            
+        } catch {
+            print(error)
+        }
+    }
+    
+    @MainActor
+    private func loadSelectedConversation() async {
+        guard let selectedConversation = selectedConversation else { return }
+        
+        isLoading = true
+        
+        do {
+            guard let url = URL(string: "http://127.0.0.1:8000/load_conversation") else {
+                throw URLError(.badURL)
+            }
+            
+            // Create proper JSON payload
+            let payload: [String: Any] = ["file": selectedConversation]
+            let jsonData = try JSONSerialization.data(withJSONObject: payload, options: [])
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = jsonData
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Check response status code
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode != 200 {
+                    let errorData = try JSONDecoder().decode([String: String].self, from: data)
+                    throw NSError(domain: "", code: httpResponse.statusCode,
+                                userInfo: [NSLocalizedDescriptionKey: errorData["detail"] ?? "Unknown error"])
+                }
+            }
+            
+            let decoded = try JSONDecoder().decode(ServerResponse_Conversation.self, from: data)
+            
+            // Clear current messages
+            withAnimation {
+                messages.removeAll()
+            }
+            
+            // Convert server messages to local Message format
+            var newMessages: [Message] = []
+            for serverMessage in decoded.messages {
+                let isUser = serverMessage.type == "HumanMessage"
+                let message = Message(
+                    content: serverMessage.content,
+                    isUser: isUser,
+                    timestamp: Date(),
+                    isLoading: false
+                )
+                newMessages.append(message)
+            }
+            
+            withAnimation {
+                messages = newMessages
+            }
+        } catch {
+            print("Error loading conversation: \(error.localizedDescription)")
+            
+        }
+        
+        isLoading = false
+    }
+    
 }
 
 struct ServerResponse: Decodable {
     let response: String
 }
 
+struct ServerResponse_History: Decodable {
+    var files: [String]
+}
+
+struct ServerResponse_Conversation: Decodable {
+    var messages: [ServerMessage]
+}
+
+struct ServerMessage: Decodable {
+    let type: String
+    let content: String
+}
 
 #Preview {
     ContentView()

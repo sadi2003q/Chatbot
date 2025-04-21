@@ -16,12 +16,14 @@ struct MessageBubble: View {
                 Spacer()
             }
             
-            Text(message.content)
+            // Modified Text initialization with Markdown support
+            Text(.init(message.content)) // Note the .init() here
                 .padding(10)
                 .foregroundColor(message.isUser ? .white : .primary)
                 .background(message.isUser ? Color.blue : Color(.systemGray5))
                 .cornerRadius(10)
                 .frame(maxWidth: 300, alignment: message.isUser ? .trailing: .leading)
+                .textSelection(.enabled) // Optional: allows text selection
             
             if !message.isUser {
                 Spacer()
