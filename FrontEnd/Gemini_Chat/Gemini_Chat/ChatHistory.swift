@@ -41,13 +41,14 @@ struct ChatHistorySidebar: View {
                     .padding()
                     
                     // List of conversations
+                    /*
                     List {
                         ForEach(conversations, id: \.self) { fileName in
                             Button(action: {
                                 selectedConversation = fileName
                                 isShowing = false
                             }) {
-                                Text(fileName)
+                                Text(fileName.replacingOccurrences(of: ".json", with: ""))
                                     .foregroundColor(.primary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.vertical, 8)
@@ -61,6 +62,37 @@ struct ChatHistorySidebar: View {
                             }
                         }
                     }
+                     */
+                    List {
+                        ForEach(conversations, id: \.self) { fileName in
+                            Button(action: {
+                                selectedConversation = fileName
+                                isShowing = false
+                            }) {
+                                // Create the display name in one expression
+                                Text(
+                                    fileName
+                                        .replacingOccurrences(of: ".json", with: "")
+                                        .replacingOccurrences(of: "_", with: " ")
+                                        .components(separatedBy: " ")
+                                        .filter { !$0.isEmpty }
+                                        .prefix(2)  // Take first two words if you want (adjust as needed)
+                                        .joined(separator: " ")
+                                )
+                                .foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    deleteConversation(named: fileName)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
                     .listStyle(.plain)
                 }
                 .frame(width: UIScreen.main.bounds.width * 0.75)

@@ -81,20 +81,26 @@ struct ContentView: View {
                                 ))
                         }
                     }
+                    // Add an empty view at the bottom to ensure scrolling works
+                    Color.clear.frame(height: 1)
+                        .id("bottom")
                 }
                 .padding(.horizontal)
                 .padding(.top)
             }
-            .onChange(of: messages) {
-                if let lastMessage = messages.last {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            .onChange(of: messages.count) {
+                // Use a slight delay to ensure the view has updated
+                DispatchQueue.main.async {
+                    withAnimation {
+                        if let lastMessage = messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        } else {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
                     }
                 }
             }
-            
         }
-        .id(scrollViewID)
     }
     
     // MARK: - Input Area

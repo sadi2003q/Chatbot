@@ -1,4 +1,5 @@
 import json
+import random
 import os
 import uuid
 from http.client import HTTPException
@@ -9,6 +10,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 from fastapi import FastAPI
+
 
 load_dotenv()
 app = FastAPI()
@@ -37,7 +39,10 @@ class Gemini_Server:
             """)
         ]
         self.history_record = ""
+        self.file_name = ""
         self.instantiate_conversation()
+        self.make_name_function = True
+        self.uuid_prefix = ""
 
     def load_history(self):
         if self.history_record:
@@ -57,22 +62,33 @@ class Gemini_Server:
             unique_id = str(uuid.uuid4())
             folder = "conversations"
             os.makedirs(folder, exist_ok=True)  # Step 1: Create folder if it doesn't exist
-            filename = os.path.join(folder, f"{unique_id}.json")  # Step 2: File path in folder
-            with open(filename, 'w') as f:
+            self.file_name = os.path.join(folder, f"{unique_id}.json")  # Step 2: File path in folder
+            with open(self.file_name, 'w') as f:
                 json.dump([], f, indent=4)  # Step 3: Initialize with empty list
-            self.history_record = filename  # Save path to instance
+            self.history_record = self.file_name  # Save path to instance
 
     def make_name(self):
         prompt = PromptTemplate(
             template="""
-            Please check according to this list of conversation : {conversation} 
+            Please check according to this list of conversation : {conversation}
             if it is possible to assign a name for this Conversation or not. IF yes then please assign
-            a simple name for this conversation.  
+            a simple name for this conversation. it should not contain any space or specialCharacter.
+            because i will use this name as the file name.but can have underscore for better
+            readability. and the name will contain 2 words not more such as if it is about water then 'Water_Definition'  
+            just write me the name not a single word or alphabet extra extra. just the name.  
             """,
-            input_variables=["conversations"]
+            input_variables=["conversation"]
         )
         chain = prompt | self.model | StrOutputParser()
-        return chain.invoke({"self.history": self.history})
+        return chain.invoke({"conversation": self.history})
+
+    def rename_History(self, new_name: str):
+        start = random.randint(0, 22)
+        unique_id = str(uuid.uuid4())[start: start+7]
+        new_path = f"conversations/{new_name+"__"+unique_id}.json"
+
+        os.rename(self.file_name, new_path)
+        self.file_name = new_path
 
     def instantiate_conversation(self):
         self.history = [
@@ -109,55 +125,11 @@ class Gemini_Server:
                 f.seek(0)
                 json.dump(records, f, indent=4)
                 f.truncate()
+
+        # if len(self.history) == 4 or len(self.history) == 5:
+        #     main_name = self.make_name()
+        #     print(f"new name : {main_name}")
+        #     self.rename_History(main_name)
+
         return ai_message.content
 
-
-server = Gemini_Server()
-
-
-@app.post("/instantiate")
-def instantiate():
-    server.instantiate_conversation()
-
-
-@app.post("/model_response")
-def model_response(request_data: dict):
-    user_query = request_data['user_query']
-    response = server.model_response(user_query)
-    return {"response": response}
-
-
-@app.post("/list_conversations")
-def list_conversations():
-    folder = "conversations"
-    if not os.path.exists(folder):
-        print("No 'conversations' folder found.")
-        return []
-
-    files = os.listdir(folder)
-    print("Conversation Files:")
-    return {"files": files}
-
-
-# @app.post("/conversation_name")
-# def conversation_name():
-
-
-@app.post("/load_conversation")
-def load_conversation(file: str = Body(..., embed=True)):  # Modify this line
-    file_path = f"conversations/{file}"
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Conversation file not found")
-
-    try:
-        with open(file_path, 'r') as f:
-            messages = json.load(f)
-        return {"messages": messages}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading conversation: {str(e)}")
-
-
-if __name__ == "__main__":
-    load_conversation('b8a46fb9-0ba4-44af-ab2f-f05b3ff9f183.json')
-
-# uvicorn Gemini_Server:app --reload --host 0.0.0.0 --port 8000
