@@ -2,8 +2,6 @@ import json
 import random
 import os
 import uuid
-from http.client import HTTPException
-from fastapi import Body
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
@@ -84,11 +82,11 @@ class Gemini_Server:
 
     def rename_History(self, new_name: str):
         start = random.randint(0, 22)
-        unique_id = str(uuid.uuid4())[start: start+7]
-        new_path = f"conversations/{new_name+"__"+unique_id}.json"
-
+        unique_id = str(uuid.uuid4())[start: start + 7]
+        new_path = f"conversations/{new_name + '__' + unique_id}.json"
         os.rename(self.file_name, new_path)
         self.file_name = new_path
+        self.history_record = new_path
 
     def instantiate_conversation(self):
         self.history = [
@@ -126,10 +124,10 @@ class Gemini_Server:
                 json.dump(records, f, indent=4)
                 f.truncate()
 
-        # if len(self.history) == 4 or len(self.history) == 5:
-        #     main_name = self.make_name()
-        #     print(f"new name : {main_name}")
-        #     self.rename_History(main_name)
+        if len(self.history) == 4 or len(self.history) == 5:
+            main_name = self.make_name()
+            print(f"new name : {main_name}")
+            self.rename_History(main_name)
 
         return ai_message.content
 

@@ -55,6 +55,21 @@ def load_conversation(file: str = Body(..., embed=True)):  # Modify this line
         raise HTTPException(status_code=500, detail=f"Error loading conversation: {str(e)}")
 
 
+@app.delete("/delete_conversation")
+def delete_conversation(file: str = Body(..., embed=True)):
+    file_path = f"conversations/{file}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    print(f"file : {file}")
+    print(f"file to delete : {file_path}")
+    try:
+        os.remove(file_path)
+        return {"response": f"{file} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def test_rename_file(file_path: str):
     os.rename(file_path, "conversations/Random_name.json")
 

@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-
+/*
 struct MessageBubble: View {
     let message: Message
     
@@ -63,7 +63,48 @@ struct MessageBubble2: View {
             ))
         }
     }
+*/
 
+import SwiftUI
+
+struct MessageBubble: View {
+    let message: Message
+    
+    var body: some View {
+        // Wrapping in HStack for proper alignment
+        HStack {
+            if message.isUser {
+                Spacer()
+            }
+            
+            // Main message content
+            Text(.init(message.content)) // Using .init() for Markdown support
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .foregroundColor(message.isUser ? .white : .primary)
+                .background(
+                    message.isUser ? Color.blue : Color(.systemGray5)
+                )
+                .cornerRadius(12)
+                .frame(
+                    maxWidth: 300,
+                    alignment: message.isUser ? .trailing : .leading
+                )
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true) // Ensure proper text wrapping
+            
+            if !message.isUser {
+                Spacer()
+            }
+        }
+        .transition(.asymmetric(
+            insertion: .move(edge: message.isUser ? .trailing : .leading)
+                .combined(with: .opacity),
+            removal: .opacity
+        ))
+        .id(message.id) // Important for animation identity
+    }
+}
 
 //#Preview {
 //    MessageBubble()
